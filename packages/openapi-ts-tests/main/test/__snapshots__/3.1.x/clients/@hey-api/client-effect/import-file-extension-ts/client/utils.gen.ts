@@ -67,7 +67,7 @@ export const getParseAs = (contentType: string | undefined): Exclude<Config['par
   if (
     ['application/', 'audio/', 'image/', 'video/'].some((type) => cleanContent.startsWith(type))
   ) {
-    return 'arrayBuffer';
+    return 'blob';
   }
   if (cleanContent.startsWith('text/')) return 'text';
   return;

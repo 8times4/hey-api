@@ -38,13 +38,16 @@ const tryPromise = <A>(stage: ClientError['stage'], message: string, evaluate: (
     try: evaluate,
   });
 
-const parseResponse = (
+type ParseAs = Exclude<Config['parseAs'], 'auto' | undefined>;
+
+const resolveParseAs = (
   response: HttpClientResponse.HttpClientResponse,
   parseAs: Config['parseAs'],
-) => {
-  const resolved =
-    (parseAs === 'auto' ? getParseAs(response.headers['content-type']) : parseAs) ?? 'json';
-  switch (resolved) {
+): ParseAs =>
+  (parseAs === 'auto' ? getParseAs(response.headers['content-type']) : parseAs) ?? 'json';
+
+const parseResponse = (response: HttpClientResponse.HttpClientResponse, parseAs: ParseAs) => {
+  switch (parseAs) {
     case 'arrayBuffer':
       return response.arrayBuffer;
     case 'blob':
@@ -184,16 +187,13 @@ export const createClient = (config: Config = {}): Client => {
       Effect.gen(function* () {
         const { opts, request } = yield* beforeRequest(options);
         const response = yield* execute(opts, request);
-        let data = yield* parseResponse(response, opts.parseAs);
+        const parseAs = resolveParseAs(response, opts.parseAs);
+        let data = yield* parseResponse(response, parseAs);
 
         if (response.status < 200 || response.status >= 300) {
           return yield* Effect.fail(new ResponseError({ data, request, response }));
         }
-        if (
-          ((opts.parseAs === 'auto' && getParseAs(response.headers['content-type']) === 'json') ||
-            opts.parseAs === 'json') &&
-          data !== undefined
-        ) {
+        if (parseAs === 'json' && data !== undefined) {
           data = yield* transformResponse(opts, data);
         }
 
@@ -212,8 +212,9 @@ export const createClient = (config: Config = {}): Client => {
             if (response.status >= 200 && response.status < 300) {
               return Effect.succeed({ opts, response });
             }
-            return Effect.flatMap(parseResponse(response, opts.parseAs), (data) =>
-              Effect.fail(new ResponseError({ data, request, response })),
+            return Effect.flatMap(
+              parseResponse(response, resolveParseAs(response, opts.parseAs)),
+              (data) => Effect.fail(new ResponseError({ data, request, response })),
             );
           }),
         ),
