@@ -10,6 +10,7 @@ import { myClientPlugin } from './custom/client/plugin';
 const clients = [
   '@hey-api/client-angular',
   '@hey-api/client-axios',
+  '@hey-api/client-effect',
   '@hey-api/client-fetch',
   '@hey-api/client-ky',
   '@hey-api/client-next',

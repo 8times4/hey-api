@@ -49,6 +49,104 @@ for (const version of versions) {
       {
         config: createConfig({
           output: 'default',
+          plugins: ['@hey-api/effect'],
+        }),
+        description: 'generate Effect HttpApi contract',
+      },
+      {
+        config: createConfig({
+          output: 'default',
+          plugins: ['effect-schema'],
+        }),
+        description: 'generate Effect schemas',
+      },
+      {
+        config: createConfig({
+          output: 'sdk',
+          plugins: [
+            'effect-schema',
+            '@hey-api/client-effect',
+            {
+              name: '@hey-api/sdk',
+              transformer: true,
+              validator: true,
+            },
+          ],
+        }),
+        description: 'generate Effect SDK with Effect Schema validation',
+      },
+      ...(version === '3.1.x'
+        ? [
+            {
+              config: createConfig({
+                input: 'effect-webhooks.yaml',
+                output: 'effect-webhooks',
+                plugins: ['effect-schema'],
+              }),
+              description: 'generate Effect webhook schemas',
+            },
+            {
+              config: createConfig({
+                input: 'effect-edge-cases.yaml',
+                output: 'effect-edge-cases',
+                plugins: ['@hey-api/effect'],
+              }),
+              description: 'generate Effect edge cases',
+              warningCount: 8,
+              warnings: [
+                'objectFilter has parameter serialization that Effect HttpApi cannot represent exactly',
+                'then is exposed as "then_" to provide safe client property access',
+                'constructor is exposed as "constructor_" to provide safe client property access',
+                'eventStream response 200 uses text/event-stream; server-sent events are not supported',
+                '2 operations declare cookie parameters',
+                '2 operations declare security',
+              ],
+            },
+            {
+              config: createConfig({
+                input: 'schema-const.yaml',
+                output: 'schema-const',
+                plugins: ['effect-schema'],
+              }),
+              description: 'generate Effect object const schemas',
+            },
+            {
+              config: createConfig({
+                input: 'sdk-instance.yaml',
+                output: 'effect-client',
+                plugins: [
+                  'zod',
+                  '@hey-api/client-effect',
+                  {
+                    name: '@hey-api/sdk',
+                    transformer: true,
+                    validator: true,
+                  },
+                ],
+              }),
+              description: 'generate Effect SDK with Zod validation',
+            },
+            {
+              config: createConfig({
+                input: 'sdk-instance.yaml',
+                output: 'effect-client',
+                plugins: [
+                  'valibot',
+                  '@hey-api/client-effect',
+                  {
+                    name: '@hey-api/sdk',
+                    transformer: true,
+                    validator: true,
+                  },
+                ],
+              }),
+              description: 'generate Effect SDK with Valibot validation',
+            },
+          ]
+        : []),
+      {
+        config: createConfig({
+          output: 'default',
           plugins: ['@hey-api/sdk', '@hey-api/client-fetch'],
         }),
         description: 'generate SDK',
@@ -201,26 +299,63 @@ for (const version of versions) {
       },
     ];
 
-    it.each(scenarios)('$description', async ({ config }) => {
-      await createClient(config);
+    it.each(scenarios)('$description', async (scenario) => {
+      const { config } = scenario;
+      const warnings = 'warnings' in scenario ? scenario.warnings : undefined;
+      const consoleWarn = warnings
+        ? vi.spyOn(console, 'warn').mockImplementation(() => {})
+        : undefined;
+      try {
+        await createClient(config);
 
-      const filePaths = getFilePaths(config.output);
+        const filePaths = getFilePaths(config.output);
 
-      await Promise.all(
-        filePaths.map(async (filePath) => {
-          const fileContent = fs.readFileSync(filePath, 'utf-8');
-          await expect(fileContent).toMatchFileSnapshot(
-            path.join(
-              import.meta.dirname,
-              '__snapshots__',
-              version,
-              namespace,
-              filePath.slice(outputDir.length + 1),
-            ),
-          );
-        }),
-      );
+        await Promise.all(
+          filePaths.map(async (filePath) => {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            await expect(fileContent).toMatchFileSnapshot(
+              path.join(
+                import.meta.dirname,
+                '__snapshots__',
+                version,
+                namespace,
+                filePath.slice(outputDir.length + 1),
+              ),
+            );
+          }),
+        );
+        if (consoleWarn && warnings) {
+          for (const warning of warnings) {
+            expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining(warning));
+          }
+          if (scenario.warningCount !== undefined) {
+            expect(consoleWarn).toHaveBeenCalledTimes(scenario.warningCount);
+          }
+        }
+      } finally {
+        consoleWarn?.mockRestore();
+      }
     });
+
+    if (version === '3.1.x') {
+      it('rejects Promise-only wrappers with the Effect client', async () => {
+        await expect(
+          createClient(
+            createConfig({
+              output: 'incompatible-wrapper',
+              plugins: ['@hey-api/client-effect', '@tanstack/react-query'],
+            }),
+          ),
+        ).rejects.toMatchObject({
+          originalError: {
+            error: {
+              message:
+                '@hey-api/client-effect cannot be combined with @tanstack/react-query: it expects Promise-returning SDK functions',
+            },
+          },
+        });
+      });
+    }
   });
 }
 
