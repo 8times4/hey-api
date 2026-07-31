@@ -8,6 +8,36 @@ export const FilterSchema = Schema.Struct({
   role: Schema.optionalKey(Schema.String)
 });
 
+export const DictionaryWithStringSchema = Schema.Record(Schema.String, Schema.String);
+
+export const DictionaryWithPropertiesAndAdditionalPropertiesSchema = Schema.StructWithRest(Schema.Struct({
+  foo: Schema.optionalKey(Schema.Number.check(Schema.isFinite())),
+  bar: Schema.optionalKey(Schema.Boolean)
+}), [Schema.Record(Schema.String.check(Schema.isPattern(new RegExp('^(?!(?:foo|bar)$)[\\s\\S]*$'))), Schema.String)]);
+
+export const FileSchema = Schema.Struct({
+  mime: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(24)),
+  file: Schema.optionalKey(Schema.String.check(Schema.makeFilter(value => URL.canParse(value), { expected: 'a valid URL' })).annotate({ format: 'uri' }))
+});
+
+export const ModelWithPatternSchema = Schema.Struct({
+  key: Schema.String.check(Schema.isMaxLength(64), Schema.isPattern(new RegExp('^[a-zA-Z0-9_]*$'))),
+  name: Schema.String.check(Schema.isMaxLength(255)),
+  modified: Schema.optionalKey(Schema.String.check(Schema.makeFilter(value => {
+    if (!/^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))[tT](?:[01]\d|2[0-3]):[0-5]\d:(?:[0-5]\d|60)(?:\.\d+)?(?:[zZ]|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(value)) {
+      return false;
+    }
+    if (!value.includes(':60')) {
+      return true;
+    }
+    const parsed = new globalThis.Date(value.replace(':60', ':59'));
+    if (parsed.getUTCHours() !== 23 || parsed.getUTCMinutes() !== 59) {
+      return false;
+    }
+    return parsed.getUTCMonth() === 5 && parsed.getUTCDate() === 30 || parsed.getUTCMonth() === 11 && parsed.getUTCDate() === 31;
+  }, { expected: 'an RFC 3339 date-time' })).annotate({ format: 'date-time' }))
+});
+
 export const TimeFormatsSchema = Schema.Struct({
   dateTime: Schema.String.check(Schema.makeFilter(value => {
     if (!/^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))[tT](?:[01]\d|2[0-3]):[0-5]\d:(?:[0-5]\d|60)(?:\.\d+)?(?:[zZ]|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(value)) {
@@ -160,6 +190,20 @@ export const ColonPathDataSchema = Schema.Struct({
  */
 export const ColonPathResponseSchema = Schema.Void.annotate({ description: 'No content' });
 
+export const FileResponseDataSchema = Schema.Struct({
+  body: Schema.optionalKey(Schema.Never),
+  path: Schema.Struct({
+    'api-version': Schema.String,
+    id: Schema.String
+  }),
+  query: Schema.optionalKey(Schema.Never)
+});
+
+/**
+ * Audio response
+ */
+export const FileResponseResponseSchema = Schema.Uint8Array.annotate({ description: 'Audio response' });
+
 export const MultipartResponseDataSchema = Schema.Struct({
   body: Schema.optionalKey(Schema.Never),
   path: Schema.optionalKey(Schema.Never),
@@ -257,3 +301,13 @@ export const ObjectFilterQuerySchema = Schema.Struct({
 });
 
 export const RecursiveUploadPayloadSchema = RecursiveBinarySchema;
+
+export const FileResponsePathParamsSchema = Schema.Struct({
+  api_version: Schema.String,
+  id: Schema.String
+});
+
+/**
+ * Audio response
+ */
+export const FileResponseResponse200Schema = Schema.Uint8Array.annotate({ description: 'Audio response' });

@@ -8,6 +8,27 @@ export type Filter = {
   role?: string;
 };
 
+export type DictionaryWithString = {
+  [key: string]: string;
+};
+
+export type DictionaryWithPropertiesAndAdditionalProperties = {
+  foo?: number;
+  bar?: boolean;
+  [key: string]: string | number | boolean | undefined;
+};
+
+export type File = {
+  mime: string;
+  file?: string;
+};
+
+export type ModelWithPattern = {
+  key: string;
+  name: string;
+  modified?: string;
+};
+
 export type TimeFormats = {
   dateTime: string;
   time: string;
@@ -179,6 +200,25 @@ export type ColonPathResponses = {
 };
 
 export type ColonPathResponse = ColonPathResponses[keyof ColonPathResponses];
+
+export type FileResponseData = {
+  body?: never;
+  path: {
+    'api-version': string;
+    id: string;
+  };
+  query?: never;
+  url: '/api/v{api-version}/file/{id}';
+};
+
+export type FileResponseResponses = {
+  /**
+   * Audio response
+   */
+  200: Blob | File;
+};
+
+export type FileResponseResponse = FileResponseResponses[keyof FileResponseResponses];
 
 export type MultipartResponseData = {
   body?: never;

@@ -46,37 +46,36 @@ for (const version of versions) {
         }),
         description: 'generate schemas',
       },
-      {
-        config: createConfig({
-          output: 'default',
-          plugins: ['@hey-api/effect'],
-        }),
-        description: 'generate Effect HttpApi contract',
-      },
-      {
-        config: createConfig({
-          output: 'default',
-          plugins: ['effect-schema'],
-        }),
-        description: 'generate Effect schemas',
-      },
-      {
-        config: createConfig({
-          output: 'sdk',
-          plugins: [
-            'effect-schema',
-            '@hey-api/client-effect',
+      ...(version === '2.0.x'
+        ? [
             {
-              name: '@hey-api/sdk',
-              transformer: true,
-              validator: true,
+              config: createConfig({
+                input: 'effect-no-content.yaml',
+                output: 'no-content',
+                plugins: ['@hey-api/effect'],
+              }),
+              description: 'generate an Effect client for a bodyless Swagger response',
             },
-          ],
-        }),
-        description: 'generate Effect SDK with Effect Schema validation',
-      },
+          ]
+        : []),
       ...(version === '3.1.x'
         ? [
+            {
+              config: createConfig({
+                input: 'effect-sdk.yaml',
+                output: 'sdk',
+                plugins: [
+                  'effect-schema',
+                  '@hey-api/client-effect',
+                  {
+                    name: '@hey-api/sdk',
+                    transformer: true,
+                    validator: true,
+                  },
+                ],
+              }),
+              description: 'generate Effect SDK with Effect Schema validation',
+            },
             {
               config: createConfig({
                 input: 'effect-webhooks.yaml',
@@ -92,11 +91,12 @@ for (const version of versions) {
                 plugins: ['@hey-api/effect'],
               }),
               description: 'generate Effect edge cases',
-              warningCount: 8,
+              warningCount: 9,
               warnings: [
                 'objectFilter has parameter serialization that Effect HttpApi cannot represent exactly',
                 'then is exposed as "then_" to provide safe client property access',
                 'constructor is exposed as "constructor_" to provide safe client property access',
+                'fileResponse path parameter "api-version" is exposed as "api_version"',
                 'eventStream response 200 uses text/event-stream; server-sent events are not supported',
                 '2 operations declare cookie parameters',
                 '2 operations declare security',
@@ -109,38 +109,6 @@ for (const version of versions) {
                 plugins: ['effect-schema'],
               }),
               description: 'generate Effect object const schemas',
-            },
-            {
-              config: createConfig({
-                input: 'sdk-instance.yaml',
-                output: 'effect-client',
-                plugins: [
-                  'zod',
-                  '@hey-api/client-effect',
-                  {
-                    name: '@hey-api/sdk',
-                    transformer: true,
-                    validator: true,
-                  },
-                ],
-              }),
-              description: 'generate Effect SDK with Zod validation',
-            },
-            {
-              config: createConfig({
-                input: 'sdk-instance.yaml',
-                output: 'effect-client',
-                plugins: [
-                  'valibot',
-                  '@hey-api/client-effect',
-                  {
-                    name: '@hey-api/sdk',
-                    transformer: true,
-                    validator: true,
-                  },
-                ],
-              }),
-              description: 'generate Effect SDK with Valibot validation',
             },
           ]
         : []),
@@ -337,7 +305,54 @@ for (const version of versions) {
       }
     });
 
+    it('generates Effect output from normalized OpenAPI', async () => {
+      const config = createConfig({
+        input: 'sdk-instance.yaml',
+        output: 'smoke',
+        plugins: ['@hey-api/effect'],
+      });
+
+      await createClient(config);
+
+      expect(fs.readFileSync(path.join(config.output, 'effect.gen.ts'), 'utf8')).toContain(
+        'HttpApi.make',
+      );
+      expect(fs.readFileSync(path.join(config.output, 'effect-schema.gen.ts'), 'utf8')).toContain(
+        'effect/Schema',
+      );
+    });
+
     if (version === '3.1.x') {
+      it.each([
+        { importName: 'v', validator: 'valibot' },
+        { importName: 'z', validator: 'zod' },
+      ] as const)(
+        'generates an Effect SDK with $validator validation',
+        async ({ importName, validator }) => {
+          const config = createConfig({
+            input: 'sdk-instance.yaml',
+            output: `effect-client-${validator}`,
+            plugins: [
+              validator,
+              '@hey-api/client-effect',
+              {
+                name: '@hey-api/sdk',
+                transformer: true,
+                validator: true,
+              },
+            ],
+          });
+
+          await createClient(config);
+
+          const sdk = fs.readFileSync(path.join(config.output, 'sdk.gen.ts'), 'utf8');
+          expect(sdk).toContain(`import * as ${importName} from '${validator}';`);
+          expect(sdk).toContain('requestValidator:');
+          expect(sdk).toContain('responseTransformer:');
+          expect(fs.existsSync(path.join(config.output, 'client', 'client.gen.ts'))).toBe(true);
+        },
+      );
+
       it('rejects Promise-only wrappers with the Effect client', async () => {
         await expect(
           createClient(

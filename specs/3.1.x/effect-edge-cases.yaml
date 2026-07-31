@@ -73,6 +73,27 @@ paths:
       responses:
         '204':
           description: No content
+  '/api/v{api-version}/file/{id}':
+    get:
+      operationId: fileResponse
+      tags:
+        - files
+      parameters:
+        - in: path
+          name: api-version
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audio response
+          content:
+            audio/mpeg: {}
   /multipart-response:
     get:
       operationId: multipartResponse
@@ -182,6 +203,47 @@ components:
       properties:
         role:
           type: string
+    DictionaryWithString:
+      type: object
+      additionalProperties:
+        type: string
+    DictionaryWithPropertiesAndAdditionalProperties:
+      type: object
+      properties:
+        foo:
+          type: number
+        bar:
+          type: boolean
+      additionalProperties:
+        type: string
+    File:
+      type: object
+      required:
+        - mime
+      properties:
+        mime:
+          type: string
+          minLength: 1
+          maxLength: 24
+        file:
+          type: string
+          format: uri
+    ModelWithPattern:
+      type: object
+      required:
+        - key
+        - name
+      properties:
+        key:
+          type: string
+          maxLength: 64
+          pattern: ^[a-zA-Z0-9_]*$
+        name:
+          type: string
+          maxLength: 255
+        modified:
+          type: string
+          format: date-time
     TimeFormats:
       type: object
       required:

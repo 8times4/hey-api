@@ -5,7 +5,7 @@ import * as Schema from 'effect/Schema';
 import { HttpClient, HttpClientRequest } from 'effect/unstable/http';
 import { HttpApi, HttpApiClient, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/unstable/httpapi';
 
-import { ColonPathPathParamsSchema, ObjectFilterQuerySchema, RecursiveUploadPayloadSchema } from './effect-schema.gen';
+import { ColonPathPathParamsSchema, FileResponsePathParamsSchema, FileResponseResponse200Schema, ObjectFilterQuerySchema, RecursiveUploadPayloadSchema } from './effect-schema.gen';
 
 const DefaultGroup = HttpApiGroup.make('default').add(HttpApiEndpoint.get('taggedDefault', '/tagged', {
   success: HttpApiSchema.Empty(204)
@@ -36,6 +36,11 @@ const UntaggedGroup = HttpApiGroup.make('untagged').add(HttpApiEndpoint.get('tag
   success: HttpApiSchema.Empty(204)
 }));
 
+const FilesGroup = HttpApiGroup.make('files').add(HttpApiEndpoint.get('fileResponse', '/api/v:api_version/file/:id', {
+  params: FileResponsePathParamsSchema,
+  success: FileResponseResponse200Schema.pipe(HttpApiSchema.asUint8Array({ contentType: 'audio/mpeg' })).pipe(HttpApiSchema.status(200))
+}));
+
 const MultipartGroup = HttpApiGroup.make('multipart').add(HttpApiEndpoint.get('multipartResponse', '/multipart-response', {
   success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array({ contentType: 'multipart/form-data' })).pipe(HttpApiSchema.status(200))
 }));
@@ -60,7 +65,7 @@ const TraceGroup = HttpApiGroup.make('trace').add(HttpApiEndpoint.make('TRACE')(
   success: HttpApiSchema.Empty(204)
 }));
 
-export const Api = HttpApi.make('Api').add(DefaultGroup, Default2Group, PetStoreGroup, UntaggedGroup, MultipartGroup, BinaryGroup, TextGroup, EventsGroup, TraceGroup);
+export const Api = HttpApi.make('Api').add(DefaultGroup, Default2Group, PetStoreGroup, UntaggedGroup, FilesGroup, MultipartGroup, BinaryGroup, TextGroup, EventsGroup, TraceGroup);
 
 /**
  * Restores literal colons in generated paths after Effect expands path parameters. Parameter values are encoded before the lowercase `%3a` marker is replaced.

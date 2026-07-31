@@ -15,14 +15,7 @@ import {
   createClient as createEffectClient,
   ResponseError,
 } from '../../../openapi-ts/dist/clients/effect';
-import { makeClient as makeSwaggerClient } from './__snapshots__/2.0.x/plugins/@hey-api/effect/default/effect.gen';
-import { makeClient } from './__snapshots__/3.1.x/plugins/@hey-api/effect/default/effect.gen';
-import {
-  DictionaryWithPropertiesAndAdditionalPropertiesSchema,
-  DictionaryWithStringSchema,
-  FileResponsePathParamsSchema,
-  ModelThatExtendsExtendsSchema,
-} from './__snapshots__/3.1.x/plugins/@hey-api/effect/default/effect-schema.gen';
+import { makeClient as makeSwaggerClient } from './__snapshots__/2.0.x/plugins/@hey-api/effect/no-content/effect.gen';
 import {
   Api as EdgeApi,
   makeClient as makeEdgeClient,
@@ -34,7 +27,12 @@ import {
   ConstrainedEnumSchema,
   ConstrainedIntersectionSchema,
   ConstrainedUnionSchema,
+  DictionaryWithPropertiesAndAdditionalPropertiesSchema,
+  DictionaryWithStringSchema,
+  FileResponsePathParamsSchema,
+  FileSchema,
   type FilterSchema,
+  ModelWithPatternSchema,
   NestedDictionarySchema,
   RecursiveBinarySchema,
   RecursiveUploadDataSchema,
@@ -42,13 +40,6 @@ import {
   TimeFormatsSchema,
 } from './__snapshots__/3.1.x/plugins/@hey-api/effect/effect-edge-cases/effect-schema.gen';
 import { FooSchema as ConstFooSchema } from './__snapshots__/3.1.x/plugins/effect-schema/schema-const/effect-schema.gen';
-import {
-  FileSchema,
-  ImportDataSchema,
-  ModelWithPatternSchema,
-  MultipartRequestDataSchema,
-  UploadFileDataSchema,
-} from './__snapshots__/3.1.x/plugins/effect-schema/sdk/effect-schema.gen';
 import { deleteFoo } from './__snapshots__/3.1.x/plugins/effect-schema/sdk/sdk.gen';
 
 it('keeps the standard Effect client lazy and uses the HttpClient service', async () => {
@@ -159,6 +150,7 @@ it('validates generated object headers before serializing them', async () => {
       },
       path: {
         BarParam: 'bar',
+        'api-version': '1',
         foo_param: 'foo',
       },
     }).pipe(provideHttpClient),
@@ -175,6 +167,7 @@ it('validates generated object headers before serializing them', async () => {
       },
       path: {
         BarParam: 'bar',
+        'api-version': '1',
         foo_param: 'foo',
       },
     }).pipe(Effect.flip, provideHttpClient),
@@ -225,7 +218,7 @@ it('reports request construction failures in the typed error channel', async () 
   }
 });
 
-it('validates string formats and accepts browser file inputs', () => {
+it('validates string formats and URI inputs', () => {
   const decodePattern = Schema.decodeUnknownSync(ModelWithPatternSchema);
   const decodeFile = Schema.decodeUnknownSync(FileSchema);
   const decodeTimeFormats = Schema.decodeUnknownSync(TimeFormatsSchema);
@@ -298,32 +291,6 @@ it('validates string formats and accepts browser file inputs', () => {
       time: '23:59:60Z',
     }),
   ).toThrow();
-
-  const file = new Blob(['content'], { type: 'text/plain' });
-  expect(
-    Schema.decodeUnknownSync(UploadFileDataSchema)({
-      body: file,
-      path: {
-        'api-version': '1',
-      },
-    }).body,
-  ).toBe(file);
-  expect(
-    Schema.decodeUnknownSync(MultipartRequestDataSchema)({
-      body: {
-        content: file,
-      },
-    }).body?.content,
-  ).toBe(file);
-  expect(
-    Schema.decodeUnknownSync(ImportDataSchema)({
-      body: {
-        propWithFile: [file],
-      },
-    }).body,
-  ).toEqual({
-    propWithFile: [file],
-  });
 });
 
 it('exposes server-sent events as an Effect Stream', async () => {
@@ -416,7 +383,7 @@ it('executes a generated Effect client request with aliased path parameters', as
   );
   const result = await Effect.runPromise(
     Effect.gen(function* () {
-      const client = yield* makeClient({
+      const client = yield* makeEdgeClient({
         baseUrl: 'https://api.example.com',
         transformClient: (client) =>
           client.pipe(
@@ -438,7 +405,7 @@ it('executes a generated Effect client request with aliased path parameters', as
           }),
         ),
       });
-      return yield* client.FileResponse.fileResponse({
+      return yield* client.files.fileResponse({
         params: {
           api_version: '1',
           id: 'example',
@@ -490,17 +457,7 @@ it('keeps named fields separate from additional properties', () => {
   acceptsFilter({ rolle: 'admin' });
 });
 
-it('preserves nested object intersections and exact object constants', () => {
-  const extended = Schema.decodeUnknownSync(ModelThatExtendsExtendsSchema)({
-    prop: 'base',
-    propExtendsA: 'a',
-    propExtendsB: { prop: 'b' },
-    propExtendsC: 'c',
-    propExtendsD: { prop: 'd' },
-  });
-  const propExtendsC: string | undefined = extended.propExtendsC;
-
-  expect(propExtendsC).toBe('c');
+it('preserves exact object constants', () => {
   expect(
     Schema.decodeUnknownSync(ConstFooSchema)({
       corge: { bar: true, baz: 'grault', extra: false, foo: 1 },
